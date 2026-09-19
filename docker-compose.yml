@@ -1,0 +1,54 @@
+version: '3.8'
+
+networks:
+  kiii_custom_net:
+    driver: bridge
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: kiii_user
+      POSTGRES_PASSWORD: kiii_password
+      POSTGRES_DB: api
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - kiii_custom_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kiii_user -d api"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "5050:5050"
+    environment:
+      DB_USER: kiii_user
+      DB_PASSWORD: kiii_password
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: api
+      PORT: 5050
+    networks:
+      - kiii_custom_net
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    networks:
+      - kiii_custom_net
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
